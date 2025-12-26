@@ -27,7 +27,12 @@ def login():
 def ping():
     host = request.json.get("host", "")
     cmd = f"ping -c 1 {host}"
-    output = subprocess.check_output(cmd, shell=True)
+    #output = subprocess.check_output(cmd, shell=True)
+    output = subprocess.check_output(
+        ["ping", "-c", "1", host],
+        stderr = subprocess.STDOUT,
+        text=True
+    )
 
 
     return {"output": output.decode()}
