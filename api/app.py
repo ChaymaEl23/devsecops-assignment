@@ -40,7 +40,9 @@ def auth():
 def exec_cmd():
     cmd = request.json.get("cmd")
     # Command Injection
-    output = subprocess.check_output(cmd, shell=True)
+    #output = subprocess.check_output(cmd, shell=True)
+    output = subprocess.check_output(cmd)
+
     return {"output": output.decode()}
 
 
@@ -56,7 +58,9 @@ def deserialize():
 def encrypt():
     text = request.json.get("text", "")
     # Chiffrement faible
-    hashed = hashlib.md5(text.encode()).hexdigest()
+    #hashed = hashlib.md5(text.encode()).hexdigest()
+    hashed = hashlib.sha256(text.encode()).hexdigest()
+
     return {"hash": hashed}
 
 
@@ -87,4 +91,6 @@ def log_data():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    #app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000)
+
