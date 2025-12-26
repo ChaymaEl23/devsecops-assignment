@@ -1,71 +1,90 @@
 from flask import Flask, request
 import sqlite3
+import pickle
 import subprocess
-import bcrypt
+import hashlib
 import os
+import logging
+
+
 app = Flask(__name__)
-SECRET_KEY = "dev-secret-key-12345"   # Hardcoded secret
-@app.route("/login", methods=["POST"])
-def login():
+
+
+# SECRET HARDCODÉ (mauvaise pratique)
+API_KEY = "API-KEY-123456"
+
+
+# Logging non sécurisé
+logging.basicConfig(level=logging.DEBUG)
+
+
+@app.route("/auth", methods=["POST"])
+def auth():
     username = request.json.get("username")
     password = request.json.get("password")
 
 
+    # SQL Injection
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-
-
     query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
     cursor.execute(query)
 
 
-    result = cursor.fetchone()
-    if result:
-        return {"status": "success", "user": username}
-    return {"status": "error", "message": "Invalid credentials"}
-@app.route("/ping", methods=["POST"])
-def ping():
-    host = request.json.get("host", "")
-    cmd = f"ping -c 1 {host}"
-    #output = subprocess.check_output(cmd, shell=True)
-    output = subprocess.check_output(
-        ["ping", "-c", "1", host],
-        stderr = subprocess.STDOUT,
-        text=True
-    )
+    if cursor.fetchone():
+        return {"status": "authenticated"}
+    return {"status": "denied"}
 
 
+@app.route("/exec", methods=["POST"])
+def exec_cmd():
+    cmd = request.json.get("cmd")
+    # Command Injection
+    output = subprocess.check_output(cmd, shell=True)
     return {"output": output.decode()}
-@app.route("/compute", methods=["POST"])
-def compute():
-    expression = request.json.get("expression", "1+1")
-    result = eval(expression)   # CRITIQUE
-    return {"result": result}
-@app.route("/hash", methods=["POST"])
-def hash_password():
-    pwd = request.json.get("password", "admin")
-    #hashed = hashlib.md5(pwd.encode()).hexdigest()
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(pwd.encode(), salt)
-    return {"md5": hashed}
-@app.route("/readfile", methods=["POST"])
-def readfile():
-    filename = request.json.get("filename", "test.txt")
+
+
+@app.route("/deserialize", methods=["POST"])
+def deserialize():
+    data = request.data
+    # Désérialisation dangereuse
+    obj = pickle.loads(data)
+    return {"object": str(obj)}
+
+
+@app.route("/encrypt", methods=["POST"])
+def encrypt():
+    text = request.json.get("text", "")
+    # Chiffrement faible
+    hashed = hashlib.md5(text.encode()).hexdigest()
+    return {"hash": hashed}
+
+
+@app.route("/file", methods=["POST"])
+def read_file():
+    filename = request.json.get("filename")
+    # Path Traversal
     with open(filename, "r") as f:
-        content = f.read()
+        return {"content": f.read()}
 
 
-    return {"content": content}
 @app.route("/debug", methods=["GET"])
 def debug():
-    # Renvoie des détails sensibles -> mauvaise pratique
+    # Divulgation d'informations sensibles
     return {
-        "debug": True,
-        "secret_key": SECRET_KEY,
-        "environment": dict(os.environ)
+        "api_key": API_KEY,
+        "env": dict(os.environ),
+        "cwd": os.getcwd()
     }
-@app.route("/hello", methods=["GET"])
-def hello():
-    return {"message": "Welcome to the DevSecOps vulnerable API"}
+
+
+@app.route("/log", methods=["POST"])
+def log_data():
+    data = request.json
+    # Log Injection
+    logging.info(f"User input: {data}")
+    return {"status": "logged"}
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)
